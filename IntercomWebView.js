@@ -1,86 +1,154 @@
-import React, {Component } from 'react';
-import { View, WebView, Dimensions } from 'react-native';
-import Spinner from 'react-native-loading-spinner-overlay';
 
-class IntercomWebView extends Component{
-    constructor(props){
-        super(props);
-        this.state = {
-            isLoading: true
-        };
-        this.onLoadEnd = this.onLoadEnd.bind(this);
+//     react-native-loading-spinner-overlay
+//     Copyright (c) 2016- Nick Baugh <niftylettuce@gmail.com>
+//     MIT Licensed
+
+// * Author: [@niftylettuce](https://twitter.com/#!/niftylettuce)
+// * Source:
+// <https://github.com/niftylettuce/react-native-loading-spinner-overlay>
+
+// # react-native-loading-spinner-overlay
+//
+// <https://github.com/facebook/react-native/issues/2501>
+// <https://rnplay.org/apps/1YkBCQ>
+// <https://github.com/facebook/react-native/issues/2501>
+// <https://github.com/brentvatne/react-native-overlay>
+//
+
+import React from 'react';
+import PropTypes from 'prop-types';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Modal,
+  ActivityIndicator
+} from 'react-native';
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0
+  },
+  background: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  textContainer: {
+    flex: 1,
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+  },
+  textContent: {
+    top: 80,
+    height: 50,
+    fontSize: 20,
+    fontWeight: 'bold'
+  }
+});
+
+const SIZES = ['small', 'normal', 'large'];
+
+export default class Spinner extends React.Component {
+
+  constructor(props) {
+    super(props);
+    this.state = { visible: this.props.visible, textContent: this.props.textContent };
+  }
+
+  static propTypes = {
+    visible: PropTypes.bool,
+    cancelable: PropTypes.bool,
+    textContent: PropTypes.string,
+    color: PropTypes.string,
+    size: PropTypes.oneOf(SIZES),
+    overlayColor: PropTypes.string
+  };
+
+  static defaultProps = {
+    visible: false,
+    cancelable: false,
+    textContent: "",
+    color: 'white',
+    size: 'large', // 'normal',
+    overlayColor: 'rgba(0, 0, 0, 0.25)'
+  };
+
+  close() {
+    this.setState({ visible: false });
+  }
+
+  componentWillReceiveProps(nextProps) {
+    const { visible, textContent } = nextProps;
+    this.setState({ visible, textContent });
+  }
+
+  _handleOnRequestClose() {
+    if (this.props.cancelable) {
+      this.close();
     }
+  }
 
-    componentDidMount = () => {
-        this.setState({
-            windowHeight: Dimensions.get('window').height
-        });
-    }
+  _renderDefaultContent() {
+    return (
+      <View style={styles.background}>
+        <ActivityIndicator
+          color={this.props.color}
+          size={this.props.size}
+          style={{ flex: 1 }}
+        />
+        <View style={styles.textContainer}>
+          <Text style={[styles.textContent, this.props.textStyle]}>{this.state.textContent}</Text>
+        </View>
+      </View>);
+  }
 
-    injectedJS = (appId, name, email, id, hideLauncher) => {
-        return `
-            window.Intercom('boot', {
-                app_id: '${appId}',
-                name: '${name}',
-                email: '${email}',
-                user_id: '${id}',
-                hide_default_launcher: ${hideLauncher}
-            });
+  _renderSpinner() {
+    const { visible } = this.state;
 
-            if (${hideLauncher})
-                window.Intercom('showMessages');
+    if (!visible)
+      return (
+        <View />
+      );
 
-            window.Intercom('onHide', function () { window.postMessage && window.postMessage('onHide') })
-                `;
-    }
+    const spinner = (
+      <View style={[
+        styles.container,
+        { backgroundColor: this.props.overlayColor }
+      ]} key={`spinner_${Date.now()}`}>
+        {this.props.children ? this.props.children : this._renderDefaultContent()}
+      </View>
+    );
 
-    onLoadEnd = () => {
-        this.setState({isLoading: false});
+    return (
+      <Modal
+        onRequestClose={() => this._handleOnRequestClose()}
+        supportedOrientations={['landscape', 'portrait']}
+        transparent
+        visible={visible}>
+        {spinner}
+      </Modal>
+    );
 
-        if (this.props.onLoadEnd)
-            this.props.onLoadEnd();
-    }
+  }
 
-    dispatch = (message) => {
-      if (message === 'onHide') {
-        this.props.onHide && this.props.onHide();
-      }
-    }
+  render() {
+    return this._renderSpinner();
+  }
 
-    render(){
-        const { appId, name, email, id, hideLauncher, defaultHeight, showLoadingOverlay, ...remainingProps } = this.props;
-        const { isLoading, windowHeight } = this.state;
-
-        let height = defaultHeight || windowHeight;
-
-        return(
-
-            <View style={[{height: height}, this.props.style]}>
-                <Spinner visible={showLoadingOverlay && isLoading} />
-                <WebView source={require('./IntercomWebView.html')}
-                         injectedJavaScript={this.injectedJS( appId, name, email, id, hideLauncher )}
-                         javaScriptEnabled={true}
-                         onLoadEnd={this.onLoadEnd}
-                         onMessage={e => this.dispatch(e.nativeEvent.data)}
-                        {...remainingProps}
-                />
-            </View>
-        )
-    }
 }
-
-IntercomWebView.PropTypes = {
-    appId: React.PropTypes.string,
-    name: React.PropTypes.string,
-    email: React.PropTypes.string,
-    hideLauncher: React.PropTypes.bool,
-    showLoadingOverlay: React.PropTypes.bool,
-    defaultHeight: React.PropTypes.number
-};
-
-IntercomWebView.defaultProps = {
-    hideLauncher: false,
-    showLoadingOverlay: true
-};
-
-export default IntercomWebView;
