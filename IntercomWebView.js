@@ -3,6 +3,19 @@ import { View, WebView, Dimensions } from 'react-native';
 import PropTypes from 'prop-types';
 import Spinner from 'react-native-loading-spinner-overlay';
 
+const patchPostMessageFunction = function() {
+  var originalPostMessage = window.postMessage;
+  var patchedPostMessage = function(message, targetOrigin, transfer) {
+    originalPostMessage(message, targetOrigin, transfer);
+  };
+  patchedPostMessage.toString = function() {
+    return String(Object.hasOwnProperty).replace('hasOwnProperty', 'postMessage');
+  };
+  window.postMessage = patchedPostMessage;
+};
+
+const injectScript = '(' + String(patchPostMessageFunction) + ')();';
+
 class IntercomWebView extends Component{
     constructor(props){
         super(props);
@@ -20,6 +33,7 @@ class IntercomWebView extends Component{
 
     injectedJS = (appId, name, email, id, hideLauncher) => {
         return `
+            ${injectScript}
             window.Intercom('boot', {
                 app_id: '${appId}',
                 name: '${name}',
@@ -57,7 +71,6 @@ class IntercomWebView extends Component{
         return(
 
             <View style={[{height: height}, this.props.style]}>
-                <Spinner visible={showLoadingOverlay && isLoading} />
                 <WebView source={require('./IntercomWebView.html')}
                          injectedJavaScript={this.injectedJS( appId, name, email, id, hideLauncher )}
                          javaScriptEnabled={true}
